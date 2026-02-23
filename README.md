@@ -7,14 +7,16 @@ Currently: add tasks to Notion via a keyboard shortcut (macOS Shortcuts) or dire
 
 ```
 claude-automation/
-├── scripts/
-│   ├── add_notion_task.sh   # Shell wrapper: dialog → Claude → Notion (macOS Shortcuts trigger)
-│   └── notion_task.py       # Notion API client (schema, search-project, create)
-├── claude-commands/
-│   └── notion-task.md       # Claude skill: create a Notion task from natural language
-├── .env.example             # Placeholder credentials — safe to commit
+├── skills/
+│   └── notion-task/
+│       ├── notion-task.md        # Claude skill definition (symlinked to ~/.claude/commands/)
+│       ├── add_notion_task.sh    # macOS Shortcuts trigger (symlinked to ~/code/scripts/)
+│       ├── notion_task.py        # Notion API client (symlinked to ~/code/scripts/)
+│       ├── install.sh            # installs only this skill
+│       └── README.md             # explains this skill
+├── .env.example                  # Placeholder credentials — safe to commit
 ├── .gitignore
-├── install.sh               # Bootstrap script for new machines
+├── install.sh                    # install-all: env setup + calls each skill's install.sh
 └── README.md
 ```
 
@@ -28,8 +30,7 @@ cd ~/code/claude-automation
 
 `install.sh` will:
 - Copy `.env.example` → `~/.claude_env` (if not already present)
-- Symlink each `claude-commands/*.md` → `~/.claude/commands/`
-- Symlink each `scripts/*` → `~/code/scripts/`
+- Run each `skills/*/install.sh` to create symlinks and set permissions
 
 Then edit `~/.claude_env` and fill in your real credentials.
 
@@ -45,13 +46,11 @@ Required environment variables:
 | `NOTION_TOKEN` | Notion integration token (`ntn_...`) |
 | `NOTION_DATABASE_ID` | ID of your Notion task database |
 
-## How to add a new Claude skill
+## How to add a new skill
 
-1. Create `claude-commands/<skill-name>.md` with the skill prompt.
-2. Run `./install.sh` to symlink it into `~/.claude/commands/`.
-3. Use it in Claude Code with `/skill-name`.
-
-## How to add a new script
-
-1. Add the script to `scripts/`.
-2. Run `./install.sh` to symlink it into `~/code/scripts/` and mark it executable.
+1. Create `skills/<skill-name>/` with at minimum:
+   - `<skill-name>.md` — the Claude skill prompt
+   - `install.sh` — creates symlinks and sets permissions
+   - `README.md` — explains what the skill does
+2. Run `./install.sh` (or `./skills/<skill-name>/install.sh` standalone).
+3. Use it in Claude Code with `/<skill-name>`.

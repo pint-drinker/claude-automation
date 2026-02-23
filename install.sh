@@ -13,23 +13,11 @@ else
   echo "~/.claude_env already exists — skipping."
 fi
 
-# ── 2. Claude commands (skill definitions) ───────────────────────────────────
-mkdir -p "$HOME/.claude/commands"
-for src in "$REPO_DIR/claude-commands/"*.md; do
-  name="$(basename "$src")"
-  dest="$HOME/.claude/commands/$name"
-  ln -sf "$src" "$dest"
-  echo "Linked ~/.claude/commands/$name → $src"
-done
-
-# ── 3. Scripts (preserve ~/code/scripts path used by macOS Shortcuts) ────────
-mkdir -p "$HOME/code/scripts"
-for src in "$REPO_DIR/scripts/"*; do
-  name="$(basename "$src")"
-  dest="$HOME/code/scripts/$name"
-  ln -sf "$src" "$dest"
-  chmod +x "$src"
-  echo "Linked ~/code/scripts/$name → $src"
+# ── 2. Install each skill ─────────────────────────────────────────────────────
+for skill_installer in "$REPO_DIR/skills/"*/install.sh; do
+  echo ""
+  echo "── Installing $(basename "$(dirname "$skill_installer")") ──"
+  source "$skill_installer"
 done
 
 # ── Summary ───────────────────────────────────────────────────────────────────
