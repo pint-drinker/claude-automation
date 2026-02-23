@@ -37,6 +37,24 @@ Or install only this skill:
 ./skills/notion-task/install.sh
 ```
 
+## Setting up the macOS Shortcut
+
+1. Open **Shortcuts** app → click **+** to create a new shortcut.
+2. Add a **Run Shell Script** action:
+   - Shell: `/bin/zsh`
+   - Input: none
+   - Script body:
+     ```
+     /bin/zsh ~/code/scripts/add_notion_task.sh
+     ```
+3. Name the shortcut (e.g. "Add Notion Task").
+4. Assign a keyboard shortcut: open the shortcut's detail panel → click the info button → set a global keyboard shortcut (e.g. `⌃⌥N`).
+5. Optional: pin it to the menu bar for quick access.
+
+The script will show a dialog, send your text to Claude, create the Notion task, and display a notification with the task title.
+
+> **Note:** macOS may prompt for accessibility/automation permissions the first time. Allow Shortcuts to control Script Editor / System Events when asked.
+
 ## Test
 
 ```bash
