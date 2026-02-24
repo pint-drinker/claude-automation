@@ -9,48 +9,37 @@ Currently: add tasks to Notion via a keyboard shortcut (macOS Shortcuts) or dire
 claude-automation/
 ├── skills/
 │   └── notion-task/
-│       ├── notion-task.md        # Claude skill definition (symlinked to ~/.claude/commands/)
-│       ├── add_notion_task.sh    # macOS Shortcuts trigger (symlinked to ~/code/scripts/)
-│       ├── notion_task.py        # Notion API client (symlinked to ~/code/scripts/)
-│       ├── install.sh            # installs only this skill
-│       └── README.md             # explains this skill
-├── .env.example                  # Placeholder credentials — safe to commit
-├── .gitignore
-├── install.sh                    # install-all: env setup + calls each skill's install.sh
+│       ├── notion-task.md        # Claude skill definition (has __SKILL_DIR__ placeholders)
+│       ├── add_notion_task.sh    # macOS Shortcuts trigger
+│       ├── notion_task.py        # Notion API client
+│       ├── .env.example          # Credential template — copy to .env
+│       ├── install.sh            # Renders skill file, installs to ~/.claude/commands/
+│       ├── uninstall.sh          # Removes installed skill file
+│       └── README.md
+├── install.sh                    # Runs each skill's install.sh
 └── README.md
 ```
 
 ## New machine setup
 
 ```bash
-git clone <this-repo> ~/code/claude-automation
-cd ~/code/claude-automation
+git clone <this-repo>
+cd claude-automation
+cp skills/notion-task/.env.example skills/notion-task/.env
+# Fill in your real credentials in .env
 ./install.sh
 ```
 
-`install.sh` will:
-- Copy `.env.example` → `~/.claude_env` (if not already present)
-- Run each `skills/*/install.sh` to create symlinks and set permissions
+## Credentials
 
-Then edit `~/.claude_env` and fill in your real credentials.
-
-## Credentials / security
-
-- Real credentials live in `~/.claude_env` — never committed to git.
-- `.env.example` contains placeholder values only and is safe to commit.
-- `~/.claude_env` is sourced by `add_notion_task.sh` at runtime and optionally by your shell's rc file.
-
-Required environment variables:
-| Variable | Description |
-|---|---|
-| `NOTION_TOKEN` | Notion integration token (`ntn_...`) |
-| `NOTION_DATABASE_ID` | ID of your Notion task database |
+Each skill keeps its own `.env` file (git-ignored) with the secrets it needs. See each skill's `.env.example` for the required variables.
 
 ## How to add a new skill
 
 1. Create `skills/<skill-name>/` with at minimum:
-   - `<skill-name>.md` — the Claude skill prompt
-   - `install.sh` — creates symlinks and sets permissions
-   - `README.md` — explains what the skill does
+   - `<skill-name>.md` — the Claude skill prompt (use `__SKILL_DIR__` for paths)
+   - `install.sh` — renders the skill file into `~/.claude/commands/`
+   - `uninstall.sh` — removes it
+   - `README.md`
 2. Run `./install.sh` (or `./skills/<skill-name>/install.sh` standalone).
 3. Use it in Claude Code with `/<skill-name>`.

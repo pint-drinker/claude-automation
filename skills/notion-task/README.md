@@ -7,9 +7,13 @@ Adds a task to your Notion database from natural language — via Claude Code (`
 1. **Claude Code trigger**: type `/notion-task` in Claude Code, describe your task, and Claude calls `notion_task.py` to create it in Notion.
 2. **macOS Shortcut trigger**: a Shortcut runs `add_notion_task.sh`, which shows an input dialog, sends the text to `claude -p`, and displays a notification with the created task title.
 
-## Required environment variables
+## Credentials
 
-Set these in `~/.claude_env`:
+Copy `.env.example` to `.env` in this directory and fill in your values (git-ignored, never committed):
+
+```bash
+cp skills/notion-task/.env.example skills/notion-task/.env
+```
 
 | Variable | Description |
 |---|---|
@@ -20,22 +24,29 @@ Set these in `~/.claude_env`:
 
 | File | Purpose |
 |---|---|
-| `notion-task.md` | Claude skill definition — symlinked to `~/.claude/commands/` |
-| `add_notion_task.sh` | macOS Shortcuts trigger — symlinked to `~/code/scripts/` |
-| `notion_task.py` | Notion API client (schema, search-project, create) — symlinked to `~/code/scripts/` |
-| `install.sh` | Installs this skill (creates symlinks, sets permissions) |
+| `notion-task.md` | Skill prompt with `__SKILL_DIR__` placeholders — rendered at install time |
+| `add_notion_task.sh` | macOS Shortcuts trigger — call directly from the repo |
+| `notion_task.py` | Notion API client (schema, search-project, create) |
+| `.env.example` | Template for credentials — copy to `.env` and fill in |
+| `install.sh` | Renders skill file into `~/.claude/commands/`, sets permissions |
+| `uninstall.sh` | Removes the installed skill file — leaves nothing behind |
 
 ## Install
 
-From the repo root:
-```bash
-./install.sh          # installs all skills
-```
-
-Or install only this skill:
 ```bash
 ./skills/notion-task/install.sh
 ```
+
+**What it touches outside this directory:**
+- `~/.claude/commands/notion-task.md` — 1 rendered copy (required for Claude Code to discover the skill)
+
+## Uninstall
+
+```bash
+./skills/notion-task/uninstall.sh
+```
+
+Removes `~/.claude/commands/notion-task.md`. Nothing else is left behind.
 
 ## Setting up the macOS Shortcut
 
@@ -45,7 +56,7 @@ Or install only this skill:
    - Input: none
    - Script body:
      ```
-     /bin/zsh ~/code/scripts/add_notion_task.sh
+     /bin/zsh /path/to/claude-automation/skills/notion-task/add_notion_task.sh
      ```
 3. Name the shortcut (e.g. "Add Notion Task").
 4. Assign a keyboard shortcut: open the shortcut's detail panel → click the info button → set a global keyboard shortcut (e.g. `⌃⌥N`).
@@ -58,5 +69,5 @@ The script will show a dialog, send your text to Claude, create the Notion task,
 ## Test
 
 ```bash
-python3 ~/code/scripts/notion_task.py schema
+python3 /path/to/claude-automation/skills/notion-task/notion_task.py schema
 ```

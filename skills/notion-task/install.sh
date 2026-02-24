@@ -1,19 +1,23 @@
 #!/bin/zsh
 # skills/notion-task/install.sh — install the notion-task skill
 # Safe to run multiple times (idempotent). Also callable standalone.
+#
+# What this touches outside the repo:
+#   ~/.claude/commands/notion-task.md  (rendered copy with resolved paths)
 
 set -e
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-mkdir -p "$HOME/.claude/commands" "$HOME/code/scripts"
-
-ln -sf "$SKILL_DIR/notion-task.md" "$HOME/.claude/commands/notion-task.md"
-echo "Linked ~/.claude/commands/notion-task.md → $SKILL_DIR/notion-task.md"
-
-ln -sf "$SKILL_DIR/add_notion_task.sh" "$HOME/code/scripts/add_notion_task.sh"
-echo "Linked ~/code/scripts/add_notion_task.sh → $SKILL_DIR/add_notion_task.sh"
-
-ln -sf "$SKILL_DIR/notion_task.py" "$HOME/code/scripts/notion_task.py"
-echo "Linked ~/code/scripts/notion_task.py → $SKILL_DIR/notion_task.py"
+# Render skill file with resolved paths into ~/.claude/commands/
+mkdir -p "$HOME/.claude/commands"
+rm -f "$HOME/.claude/commands/notion-task.md"
+sed "s|__SKILL_DIR__|$SKILL_DIR|g" "$SKILL_DIR/notion-task.md" > "$HOME/.claude/commands/notion-task.md"
+echo "Installed ~/.claude/commands/notion-task.md"
 
 chmod +x "$SKILL_DIR/add_notion_task.sh" "$SKILL_DIR/notion_task.py"
+
+if [[ ! -f "$SKILL_DIR/.env" ]]; then
+  echo ""
+  echo "⚠  No .env found. Copy and fill in your credentials:"
+  echo "   cp $SKILL_DIR/.env.example $SKILL_DIR/.env"
+fi

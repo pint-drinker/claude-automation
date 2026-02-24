@@ -4,8 +4,9 @@
 INPUT=$(osascript -e 'text returned of (display dialog "What do you want to add to Notion?" default answer "" with title "Add Notion Task" buttons {"Cancel", "Add"} default button "Add")' 2>/dev/null)
 [[ $? -ne 0 || -z "$INPUT" ]] && exit 0
 
-# Load credentials from sidecar env file
-source ~/.claude_env
+# Load credentials from repo-local env file
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/.env"
 
 # Build prompt from skill file and user input
 SKILL=$(cat ~/.claude/commands/notion-task.md)
