@@ -12,9 +12,12 @@ INPUT="${INPUT## }"
 INPUT="${INPUT%% }"
 [[ -z "$INPUT" ]] && exit 0
 
-# Load credentials from repo-local env file
+# Load credentials from repo-local env file; set -a exports all vars so they
+# cascade through to claude's subprocess and its bash tool calls (notion_task.py)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+set -a
 source "$SCRIPT_DIR/.env"
+set +a
 
 # Build prompt from skill file and user input
 SKILL=$(cat ~/.claude/commands/notion-task.md)
