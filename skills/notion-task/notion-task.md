@@ -1,5 +1,7 @@
 Create a task in my Notion database from natural language.
 
+**Model preference:** This is a simple, structured task. Use the fastest available model (e.g., Haiku) if the caller supports model selection.
+
 Env file: __SKILL_DIR__/.env (set NOTION_TOKEN and NOTION_DATABASE_ID)
 
 ## Database fields that matter

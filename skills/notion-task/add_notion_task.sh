@@ -15,7 +15,7 @@ PROMPT="$SKILL
 User request: $INPUT"
 
 # Run claude non-interactively
-RESULT=$($HOME/.local/bin/claude -p "$PROMPT" 2>&1)
+RESULT=$($HOME/.local/bin/claude -p --model Haiku "$PROMPT" 2>&1)
 
 # Parse JSON result safely with python3
 TITLE=$(python3 -c "
