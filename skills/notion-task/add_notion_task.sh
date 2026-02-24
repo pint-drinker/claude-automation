@@ -29,6 +29,15 @@ User request: $INPUT"
 # calls (e.g. python3 notion_task.py) to execute without interactive approval prompts
 RESULT=$($HOME/.local/bin/claude -p --dangerously-skip-permissions --model haiku "$PROMPT" 2>&1)
 
+# Extract Notion URL from result (notion_task.py returns it in its JSON output)
+NOTION_URL=$(python3 -c "
+import sys, re
+text = sys.stdin.read()
+m = re.search(r'https://www\.notion\.so/[\w/-]+', text)
+if m:
+    print(m.group())
+" <<< "$RESULT" 2>/dev/null)
+
 # Notify with full result output; use heredoc to avoid AppleScript quoting issues
 osascript <<APPLESCRIPT
 display notification "$(echo "$RESULT" | tr -d '\"\\' | head -c 300)" with title "Added to Notion"
