@@ -1,8 +1,16 @@
 #!/bin/zsh
 
-# Show input dialog
-INPUT=$(osascript -e 'text returned of (display dialog "What do you want to add to Notion?" default answer "" with title "Add Notion Task" buttons {"Cancel", "Add"} default button "Add")' 2>/dev/null)
-[[ $? -ne 0 || -z "$INPUT" ]] && exit 0
+# Get input: stdin if piped (e.g. from Dictate Text in Shortcuts), otherwise prompt with dialog
+if [[ ! -t 0 ]]; then
+  INPUT="$(cat)"
+else
+  INPUT=$(osascript -e 'text returned of (display dialog "What do you want to add to Notion?" default answer "" with title "Add Notion Task" buttons {"Cancel", "Add"} default button "Add")' 2>/dev/null)
+  [[ $? -ne 0 || -z "$INPUT" ]] && exit 0
+fi
+
+INPUT="${INPUT## }"
+INPUT="${INPUT%% }"
+[[ -z "$INPUT" ]] && exit 0
 
 # Load credentials from repo-local env file
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -14,22 +22,13 @@ PROMPT="$SKILL
 
 User request: $INPUT"
 
-# Run claude non-interactively
-RESULT=$($HOME/.local/bin/claude -p --model Haiku "$PROMPT" 2>&1)
+# Run claude non-interactively; --dangerously-skip-permissions allows bash tool
+# calls (e.g. python3 notion_task.py) to execute without interactive approval prompts
+RESULT=$($HOME/.local/bin/claude -p --dangerously-skip-permissions --model haiku "$PROMPT" 2>&1)
 
-# Parse JSON result safely with python3
-TITLE=$(python3 -c "
-import sys, json
-try:
-    d = json.loads(sys.stdin.read())
-    print(d.get('title', 'Task added'))
-except:
-    print('Task added')
-" <<< "$RESULT" 2>/dev/null)
+# Notify with full result output; use heredoc to avoid AppleScript quoting issues
+osascript <<APPLESCRIPT
+display notification "$(echo "$RESULT" | tr -d '\"\\' | head -c 300)" with title "Added to Notion"
+APPLESCRIPT
 
-[[ -z "$TITLE" ]] && TITLE="Task added"
-
-# Sanitize for AppleScript: replace double quotes with single quotes
-SAFE_TITLE="${TITLE//\"/\'}"
-
-osascript -e "display notification \"$SAFE_TITLE\" with title \"Added to Notion\""
+echo "$RESULT"

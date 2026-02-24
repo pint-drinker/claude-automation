@@ -5,7 +5,7 @@ Adds a task to your Notion database from natural language — via Claude Code (`
 ## What it does
 
 1. **Claude Code trigger**: type `/notion-task` in Claude Code, describe your task, and Claude calls `notion_task.py` to create it in Notion.
-2. **macOS Shortcut trigger**: a Shortcut runs `add_notion_task.sh`, which shows an input dialog, sends the text to `claude -p`, and displays a notification with the created task title.
+2. **macOS Shortcut**: a Shortcut runs `add_notion_task.sh`, which accepts dictated text via stdin (voice) or shows an input dialog (keyboard), then sends the text to `claude -p` and displays a notification with the created task title.
 
 ## Credentials
 
@@ -25,7 +25,7 @@ cp skills/notion-task/.env.example skills/notion-task/.env
 | File | Purpose |
 |---|---|
 | `notion-task.md` | Skill prompt with `__SKILL_DIR__` placeholders — rendered at install time |
-| `add_notion_task.sh` | macOS Shortcuts trigger — call directly from the repo |
+| `add_notion_task.sh` | Shortcut trigger — reads stdin if piped (voice), otherwise shows an input dialog |
 | `notion_task.py` | Notion API client (schema, search-project, create) |
 | `.env.example` | Template for credentials — copy to `.env` and fill in |
 | `install.sh` | Renders skill file into `~/.claude/commands/`, sets permissions |
@@ -50,6 +50,10 @@ Removes `~/.claude/commands/notion-task.md`. Nothing else is left behind.
 
 ## Setting up the macOS Shortcut
 
+The same script handles both voice (piped stdin) and dialog (keyboard) input.
+
+### Dialog (keyboard) Shortcut
+
 1. Open **Shortcuts** app → click **+** to create a new shortcut.
 2. Add a **Run Shell Script** action:
    - Shell: `/bin/zsh`
@@ -58,11 +62,20 @@ Removes `~/.claude/commands/notion-task.md`. Nothing else is left behind.
      ```
      /bin/zsh /path/to/claude-automation/skills/notion-task/add_notion_task.sh
      ```
-3. Name the shortcut (e.g. "Add Notion Task").
-4. Assign a keyboard shortcut: open the shortcut's detail panel → click the info button → set a global keyboard shortcut (e.g. `⌃⌥N`).
-5. Optional: pin it to the menu bar for quick access.
+3. Name the shortcut (e.g. "Add Notion Task") and assign a global keyboard shortcut (e.g. `⌃⌥N`).
 
-The script will show a dialog, send your text to Claude, create the Notion task, and display a notification with the task title.
+### Voice Shortcut
+
+1. Open **Shortcuts** app → click **+** to create a new shortcut.
+2. Add a **Dictate Text** action.
+3. Add a **Run Shell Script** action:
+   - Shell: `/bin/zsh`
+   - Input: **Shortcut Input** (passes the dictated text via stdin)
+   - Script body:
+     ```
+     /bin/zsh /path/to/claude-automation/skills/notion-task/add_notion_task.sh
+     ```
+4. Name the shortcut (e.g. "Add Notion Task by Voice") and assign a global keyboard shortcut.
 
 > **Note:** macOS may prompt for accessibility/automation permissions the first time. Allow Shortcuts to control Script Editor / System Events when asked.
 
