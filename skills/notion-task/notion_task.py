@@ -18,9 +18,29 @@ import os
 import sys
 import urllib.request
 import urllib.error
+from datetime import datetime, timedelta, timezone
 
 NOTION_VERSION = "2022-06-28"
 BASE_URL = "https://api.notion.com/v1"
+
+PROJECT_CACHE_MAX_AGE_DAYS = 10
+SCHEMA_CACHE_MAX_AGE_DAYS = 30
+
+
+def get_skill_dir():
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def get_cache_dir():
+    return os.path.join(get_skill_dir(), "cache")
+
+
+def get_project_schema_path():
+    return os.path.join(get_cache_dir(), "project.json")
+
+
+def get_kanban_schema_path():
+    return os.path.join(get_cache_dir(), "kanban.json")
 
 
 def get_headers():
@@ -64,8 +84,8 @@ def notion_post(path, data):
         sys.exit(f"Notion API error {e.code}: {error_body}")
 
 
-def get_schema():
-    """Fetch database schema. 1 API call — no relation entries fetched."""
+def _fetch_schema_from_notion():
+    """Fetch database schema from Notion (no caching)."""
     db_id = get_database_id()
     db = notion_get(f"/databases/{db_id}")
 
@@ -93,8 +113,101 @@ def get_schema():
     return schema
 
 
-def search_project(query):
-    """Search the Projects relation database by name. 3 API calls total."""
+def _load_schema_cached(max_age_days=SCHEMA_CACHE_MAX_AGE_DAYS):
+    """Load task DB schema (including Kanban options) with a 5-day cache."""
+    path = get_kanban_schema_path()
+    now = datetime.now(timezone.utc)
+    max_age = timedelta(days=max_age_days)
+
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            last_updated_str = data.get("last_updated")
+            if last_updated_str:
+                last_updated = datetime.fromisoformat(last_updated_str.replace("Z", "+00:00"))
+                if now - last_updated <= max_age:
+                    return data
+        except Exception:
+            # Fall through to a full refresh
+            pass
+
+    schema = _fetch_schema_from_notion()
+    schema["last_updated"] = (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(schema, f, indent=2)
+    except Exception:
+        # If writing fails, still return the in-memory schema
+        pass
+
+    return schema
+
+
+def get_schema():
+    """Fetch database schema, using a cached copy when fresh."""
+    return _load_schema_cached()
+
+
+def search_in_projects(projects, q):
+    """Intelligent-ish text search over cached projects."""
+    q = q.strip().lower()
+    if not q:
+        return []
+    q_words = [w for w in q.split() if w]
+
+    scored = []
+    for p in projects:
+        title = p.get("title") or ""
+        t = title.lower()
+        score = 0
+
+        if t == q:
+            score += 100
+        if q in t:
+            score += 50
+        for w in q_words:
+            if w in t:
+                score += 10
+
+        if score > 0:
+            scored.append((score, p))
+
+    scored.sort(key=lambda item: (-item[0], item[1].get("title", "")))
+    return [p for _, p in scored][:10]
+
+
+def _load_project_cache(max_age_days=PROJECT_CACHE_MAX_AGE_DAYS):
+    """Load cached project schema + projects list, refreshing if stale or missing."""
+    path = get_project_schema_path()
+    now = datetime.now(timezone.utc)
+    max_age = timedelta(days=max_age_days)
+
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            last_updated_str = data.get("last_updated")
+            if last_updated_str:
+                last_updated = datetime.fromisoformat(last_updated_str.replace("Z", "+00:00"))
+                if now - last_updated <= max_age:
+                    return data
+        except Exception:
+            # Fall through to a full refresh
+            pass
+
+    return refresh_projects_cache()
+
+
+def refresh_projects_cache():
+    """Fetch Projects DB schema + all projects from Notion and write project-schema.json."""
     # 1. Get the Projects database_id from the Tasks schema
     db_id = get_database_id()
     db = notion_get(f"/databases/{db_id}")
@@ -117,21 +230,59 @@ def search_project(query):
     if not title_prop_name:
         sys.exit("Error: Could not find title property in Projects database")
 
-    # 3. Query with a title filter
-    result = notion_post(
-        f"/databases/{project_db_id}/query",
-        {
-            "filter": {"property": title_prop_name, "title": {"contains": query}},
-            "page_size": 10,
-        },
-    )
+    # 3. Query all projects (paginated)
+    projects = []
+    payload = {"page_size": 100}
+    while True:
+        result = notion_post(f"/databases/{project_db_id}/query", payload)
+        for page in result.get("results", []):
+            title_prop = page["properties"].get(title_prop_name, {})
+            title_text = "".join(t["plain_text"] for t in title_prop.get("title", []))
+            if title_text:
+                projects.append({"id": page["id"], "title": title_text})
 
-    matches = []
-    for page in result.get("results", []):
-        title_prop = page["properties"].get(title_prop_name, {})
-        title_text = "".join(t["plain_text"] for t in title_prop.get("title", []))
-        if title_text:
-            matches.append({"id": page["id"], "title": title_text})
+        if not result.get("has_more"):
+            break
+        payload["start_cursor"] = result.get("next_cursor")
+        if not payload["start_cursor"]:
+            break
+
+    cache_data = {
+        "project_db_id": project_db_id,
+        "title_property": title_prop_name,
+        "last_updated": (
+            datetime.now(timezone.utc)
+            .replace(microsecond=0)
+            .isoformat()
+            .replace("+00:00", "Z")
+        ),
+        "projects": projects,
+    }
+
+    path = get_project_schema_path()
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(cache_data, f, indent=2)
+    except Exception:
+        # If writing fails, we still return the in-memory data
+        pass
+
+    return cache_data
+
+
+def search_project(query):
+    """Search the Projects database by name using a cached schema + project list."""
+    # First attempt: use cached (or refreshed-if-stale) project list
+    cache_data = _load_project_cache()
+    projects = cache_data.get("projects", []) if cache_data else []
+    matches = search_in_projects(projects, query)
+
+    # If nothing found, force a refresh from Notion and try again
+    if not matches:
+        cache_data = refresh_projects_cache()
+        projects = cache_data.get("projects", []) if cache_data else []
+        matches = search_in_projects(projects, query)
 
     print(json.dumps(matches))
 

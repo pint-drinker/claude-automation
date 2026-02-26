@@ -5,7 +5,8 @@ Adds a task to your Notion database from natural language — via Claude Code (`
 ## What it does
 
 1. **Claude Code trigger**: type `/notion-task` in Claude Code, describe your task, and Claude calls `notion_task.py` to create it in Notion.
-2. **macOS Shortcut**: a Shortcut runs `add_notion_task.sh`, which accepts dictated text via stdin (voice) or shows an input dialog (keyboard), then sends the text to `claude -p` and displays a notification with the created task title.
+2. **Command line trigger**: echo "add task to kelsey project to call her today" | ./add_notion_task.sh
+3. **macOS Shortcut**: a Shortcut runs `add_notion_task.sh`, which accepts dictated text via stdin (voice) or shows an input dialog (keyboard), then sends the text to `claude -p` and displays a notification with the created task title.
 
 ## Credentials
 
