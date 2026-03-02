@@ -2,11 +2,12 @@
 """Notion Task Creator
 
 Usage:
-  notion_task.py schema                  - Print task database schema (select options only)
-  notion_task.py search-project <query>  - Search Projects database by name
-  notion_task.py create '<json>'         - Create a task from a JSON string of field values
+  notion_task.py schema                       - Print task database schema (select options only)
+  notion_task.py search-project <query>       - Search Projects database by name
+  notion_task.py create '<json>'              - Create a task from a JSON string of field values
+  notion_task.py smart-create '<json>'        - Create a task, resolving ProjectName to a relation ID
 
-Key fields: Task (title), Kanban (select), Project (relation)
+Key fields: Task (title), Kanban (select), Project (relation), ProjectName (smart-create only)
 
 Environment variables required:
   NOTION_TOKEN        - Your Notion integration token (secret_...)
@@ -28,7 +29,8 @@ SCHEMA_CACHE_MAX_AGE_DAYS = 30
 
 
 def get_skill_dir():
-    return os.path.dirname(os.path.abspath(__file__))
+    # Script lives in scripts/, skill root is one level up
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def get_cache_dir():
@@ -207,16 +209,26 @@ def _load_project_cache(max_age_days=PROJECT_CACHE_MAX_AGE_DAYS):
 
 
 def refresh_projects_cache():
-    """Fetch Projects DB schema + all projects from Notion and write project-schema.json."""
-    # 1. Get the Projects database_id from the Tasks schema
-    db_id = get_database_id()
-    db = notion_get(f"/databases/{db_id}")
-
+    """Fetch Projects DB schema + all projects from Notion and write project.json."""
+    # 1. Get project_db_id from kanban schema cache if available (no API call needed)
     project_db_id = None
-    for prop_name, prop_data in db["properties"].items():
-        if prop_name == "Project" and prop_data["type"] == "relation":
-            project_db_id = prop_data["relation"]["database_id"]
-            break
+    try:
+        kanban_path = get_kanban_schema_path()
+        if os.path.exists(kanban_path):
+            with open(kanban_path, "r", encoding="utf-8") as f:
+                kanban_data = json.load(f)
+            project_db_id = kanban_data.get("properties", {}).get("Project", {}).get("database_id")
+    except Exception:
+        pass  # Fall through to API call below
+
+    # Fallback: fetch task DB schema from API to find project_db_id
+    if not project_db_id:
+        db_id = get_database_id()
+        db = notion_get(f"/databases/{db_id}")
+        for prop_name, prop_data in db["properties"].items():
+            if prop_name == "Project" and prop_data["type"] == "relation":
+                project_db_id = prop_data["relation"]["database_id"]
+                break
 
     if not project_db_id:
         sys.exit("Error: No 'Project' relation property found in Tasks database")
@@ -361,6 +373,57 @@ def create_task(field_values_json):
     }))
 
 
+def smart_create(field_values_json):
+    """Create a task, resolving an optional ProjectName string to a relation ID.
+
+    Accepts all the same fields as 'create', plus an optional 'ProjectName' string.
+    ProjectName is resolved to a Project relation ID by searching the project cache.
+    If no match is found after a cache refresh, the task is created without a project.
+
+    Output JSON includes url, title, and project_matched (resolved project title or null).
+    """
+    field_values = json.loads(field_values_json)
+
+    project_name = field_values.pop("ProjectName", None)
+    project_matched = None
+
+    if project_name:
+        cache_data = _load_project_cache()
+        projects = cache_data.get("projects", []) if cache_data else []
+        matches = search_in_projects(projects, project_name)
+
+        if not matches:
+            cache_data = refresh_projects_cache()
+            projects = cache_data.get("projects", []) if cache_data else []
+            matches = search_in_projects(projects, project_name)
+
+        if matches:
+            field_values["Project"] = [matches[0]["id"]]
+            project_matched = matches[0]["title"]
+
+    schema = get_schema()
+    db_id = get_database_id()
+    properties = build_page_properties(field_values, schema)
+
+    result = notion_post("/pages", {
+        "parent": {"database_id": db_id},
+        "properties": properties,
+    })
+
+    title = next(
+        (v for k, v in field_values.items() if k.lower() in ("task", "name", "title")),
+        "Task",
+    )
+
+    print(json.dumps({
+        "success": True,
+        "page_id": result.get("id", ""),
+        "url": result.get("url", ""),
+        "title": title,
+        "project_matched": project_matched,
+    }))
+
+
 def main():
     if len(sys.argv) < 2:
         print(__doc__)
@@ -378,8 +441,12 @@ def main():
         if len(sys.argv) < 3:
             sys.exit("Usage: notion_task.py create '<json>'")
         create_task(sys.argv[2])
+    elif command == "smart-create":
+        if len(sys.argv) < 3:
+            sys.exit("Usage: notion_task.py smart-create '<json>'")
+        smart_create(sys.argv[2])
     else:
-        sys.exit(f"Unknown command: {command}. Use 'schema', 'search-project', or 'create'.")
+        sys.exit(f"Unknown command: {command}. Use 'schema', 'search-project', 'create', or 'smart-create'.")
 
 
 if __name__ == "__main__":

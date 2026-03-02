@@ -16,11 +16,18 @@ INPUT="${INPUT%% }"
 # cascade through to claude's subprocess and its bash tool calls (notion_task.py)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 set -a
-source "$SCRIPT_DIR/.env"
+source "$SCRIPT_DIR/../.env"
 set +a
 
-# Build prompt from skill file and user input
-SKILL=$(cat ~/.claude/commands/notion-task.md)
+# Build prompt from skill file (strip YAML frontmatter before passing to claude -p)
+SKILL=$(python3 -c "
+import sys, pathlib
+text = pathlib.Path(sys.argv[1]).read_text()
+if text.startswith('---'):
+    end = text.index('---', 3)
+    text = text[end+3:].lstrip()
+print(text, end='')
+" "$HOME/.claude/skills/notion-task/SKILL.md")
 PROMPT="$SKILL
 
 User request: $INPUT"

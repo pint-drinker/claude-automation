@@ -9,9 +9,10 @@ A collection of Claude Code skills and automation scripts for personal productiv
 ## Architecture
 
 - **`skills/<name>/`** — self-contained skill directories. Each has:
-  - `<name>.md` — skill prompt template using `__SKILL_DIR__` placeholders (resolved at install time via `sed`)
-  - `install.sh` — renders the `.md` into `~/.claude/commands/<name>.md` with absolute paths
-  - `uninstall.sh` — removes the rendered file from `~/.claude/commands/`
+  - `SKILL.md` — skill prompt template with YAML frontmatter and `__SKILL_DIR__` placeholders (resolved at install time via `sed`)
+  - `install.sh` — renders `SKILL.md` into `~/.claude/skills/<name>/SKILL.md` with absolute paths
+  - `uninstall.sh` — removes the rendered skill from `~/.claude/skills/<name>/`
+  - `scripts/` — supporting scripts (e.g. Python helpers, shell entry points)
   - `.env` / `.env.example` — per-skill credentials (git-ignored)
 - **`install.sh`** (root) — loops through all `skills/*/install.sh` files; idempotent
 
@@ -28,14 +29,15 @@ The `__SKILL_DIR__` placeholder pattern is the key convention: skill prompts ref
 ./skills/notion-task/uninstall.sh
 
 # Test the Notion API connection
-source skills/notion-task/.env && python3 skills/notion-task/notion_task.py schema
+source skills/notion-task/.env && python3 skills/notion-task/scripts/notion_task.py schema
 ```
 
 ## Adding a new skill
 
-1. Create `skills/<skill-name>/` with `<skill-name>.md`, `install.sh`, `uninstall.sh`, and `README.md`
-2. Use `__SKILL_DIR__` in the `.md` file anywhere you need an absolute path to the skill directory
-3. The `install.sh` must render the `.md` via `sed "s|__SKILL_DIR__|$SKILL_DIR|g"` into `~/.claude/commands/`
+1. Create `skills/<skill-name>/` with `SKILL.md`, `install.sh`, `uninstall.sh`, `README.md`, and a `scripts/` subdirectory for supporting scripts
+2. Add YAML frontmatter to `SKILL.md` (`name`, `description`, `disable-model-invocation`, `allowed-tools`)
+3. Use `__SKILL_DIR__` in `SKILL.md` anywhere you need an absolute path to the skill directory
+4. The `install.sh` must render `SKILL.md` via `sed "s|__SKILL_DIR__|$SKILL_DIR|g"` into `~/.claude/skills/<skill-name>/SKILL.md`
 4. Keep credentials in a per-skill `.env` file with a committed `.env.example` template
 
 ## Conventions
